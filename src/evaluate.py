@@ -1,17 +1,12 @@
 import os
-import cv2
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, random_split
 
 from data_loader import SODDataset
-from model import SimpleSODNet
+from model import get_model
 
-
-# =========================
-# 1. CONFIGURATION
-# =========================
 
 IMAGE_DIR = "dataset/DUTS-TR/DUTS-TR-Image"
 MASK_DIR = "dataset/DUTS-TR/DUTS-TR-Mask"
@@ -19,15 +14,11 @@ MASK_DIR = "dataset/DUTS-TR/DUTS-TR-Mask"
 IMG_SIZE = 256
 BATCH_SIZE = 8
 
-MODEL_PATH = "models/sod_model.pth"
-RESULTS_DIR = "results/predictions"
+MODEL_PATH = "models/unet_resnet34_best.pth"
+RESULTS_DIR = "results/predictions_unet"
 
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
-
-# =========================
-# 2. DEVICE SETUP
-# =========================
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -35,10 +26,6 @@ print("Using device:", device)
 if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
-
-# =========================
-# 3. METRIC FUNCTIONS
-# =========================
 
 def calculate_metrics(pred, mask, threshold=0.5):
     pred = (pred > threshold).float()
@@ -52,14 +39,12 @@ def calculate_metrics(pred, mask, threshold=0.5):
     precision = (intersection + 1e-7) / (pred.sum() + 1e-7)
     recall = (intersection + 1e-7) / (mask.sum() + 1e-7)
 
-    f1 = (2 * precision * recall + 1e-7) / (precision + recall + 1e-7)
+    f1 = (2 * precision * recall + 1e-7) / (
+        precision + recall + 1e-7
+    )
 
     return iou.item(), precision.item(), recall.item(), f1.item()
 
-
-# =========================
-# 4. LOAD DATASET
-# =========================
 
 dataset = SODDataset(
     image_dir=IMAGE_DIR,
@@ -81,20 +66,12 @@ val_loader = DataLoader(
 print("Validation samples:", len(val_dataset))
 
 
-# =========================
-# 5. LOAD TRAINED MODEL
-# =========================
-
-model = SimpleSODNet().to(device)
+model = get_model().to(device)
 model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 model.eval()
 
 print("Model loaded successfully.")
 
-
-# =========================
-# 6. EVALUATION
-# =========================
 
 ious = []
 precisions = []
@@ -104,7 +81,7 @@ f1_scores = []
 saved_images = 0
 
 with torch.no_grad():
-    for batch_idx, (images, masks) in enumerate(val_loader):
+    for images, masks in val_loader:
         images = images.to(device)
         masks = masks.to(device)
 
@@ -121,7 +98,6 @@ with torch.no_grad():
             recalls.append(recall)
             f1_scores.append(f1)
 
-            # Save first 10 visual examples
             if saved_images < 10:
                 image_np = images[i].cpu().permute(1, 2, 0).numpy()
                 mask_np = mask.cpu().squeeze().numpy()
@@ -130,7 +106,10 @@ with torch.no_grad():
                 pred_binary = (pred_np > 0.5).astype(np.float32)
 
                 overlay = image_np.copy()
-                overlay[:, :, 0] = np.maximum(overlay[:, :, 0], pred_binary)
+                overlay[:, :, 0] = np.maximum(
+                    overlay[:, :, 0],
+                    pred_binary
+                )
 
                 fig, axs = plt.subplots(1, 4, figsize=(14, 4))
 
@@ -161,10 +140,6 @@ with torch.no_grad():
 
                 saved_images += 1
 
-
-# =========================
-# 7. PRINT FINAL RESULTS
-# =========================
 
 print("\nEvaluation Results")
 print("------------------")

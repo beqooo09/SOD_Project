@@ -5,29 +5,19 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 from data_loader import SODDataset
-from model import SimpleSODNet
+from model import get_model
 
-
-# =========================
-# 1. CONFIGURATION
-# =========================
-# Here we define the main settings for training.
 
 IMAGE_DIR = "dataset/DUTS-TR/DUTS-TR-Image"
 MASK_DIR = "dataset/DUTS-TR/DUTS-TR-Mask"
 
 IMG_SIZE = 256
 BATCH_SIZE = 8
-EPOCHS = 50
-LEARNING_RATE = 0.001
+EPOCHS = 30
+LEARNING_RATE = 0.0001
 
-MODEL_SAVE_PATH = "models/sod_model.pth"
+MODEL_SAVE_PATH = "models/unet_resnet34_best.pth"
 
-
-# =========================
-# 2. DEVICE SETUP
-# =========================
-# If GPU is available, we use it. Otherwise we use CPU.
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)
@@ -36,13 +26,6 @@ if torch.cuda.is_available():
     print("GPU:", torch.cuda.get_device_name(0))
 
 
-# =========================
-# 3. LOAD DATASET
-# =========================
-# The dataset loads image-mask pairs.
-# Image = input
-# Mask = correct answer
-
 dataset = SODDataset(
     image_dir=IMAGE_DIR,
     mask_dir=MASK_DIR,
@@ -50,14 +33,6 @@ dataset = SODDataset(
 )
 
 print("Total samples:", len(dataset))
-
-
-# =========================
-# 4. TRAIN / VALIDATION SPLIT
-# =========================
-# We split data into training and validation.
-# Training data teaches the model.
-# Validation data checks how well the model performs on unseen data.
 
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
@@ -80,45 +55,47 @@ print("Training samples:", len(train_dataset))
 print("Validation samples:", len(val_dataset))
 
 
-# =========================
-# 5. MODEL, LOSS, OPTIMIZER
-# =========================
-# Model: CNN encoder-decoder
-# Loss: Binary Cross Entropy because mask pixels are 0 or 1
-# Optimizer: Adam updates model weights
+model = get_model().to(device)
 
-model = SimpleSODNet().to(device)
+bce_loss = nn.BCELoss()
 
-criterion = nn.BCELoss()
+
+def dice_loss(pred, target, smooth=1e-7):
+    pred = pred.view(-1)
+    target = target.view(-1)
+
+    intersection = (pred * target).sum()
+    dice = (2.0 * intersection + smooth) / (
+        pred.sum() + target.sum() + smooth
+    )
+
+    return 1 - dice
+
+
+def combined_loss(pred, target):
+    return bce_loss(pred, target) + dice_loss(pred, target)
+
+
+criterion = combined_loss
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
+best_val_loss = float("inf")
+os.makedirs("models", exist_ok=True)
 
-# =========================
-# 6. TRAINING LOOP
-# =========================
-# For each epoch:
-# - model sees images
-# - predicts masks
-# - compares predictions with real masks
-# - updates weights to reduce error
 
 for epoch in range(EPOCHS):
     model.train()
     train_loss = 0.0
 
-    loop = tqdm(train_loader, desc=f"Epoch [{epoch+1}/{EPOCHS}]")
+    loop = tqdm(train_loader, desc=f"Epoch [{epoch + 1}/{EPOCHS}]")
 
     for images, masks in loop:
         images = images.to(device)
         masks = masks.to(device)
 
-        # Forward pass
         outputs = model(images)
-
-        # Calculate loss
         loss = criterion(outputs, masks)
 
-        # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -127,12 +104,6 @@ for epoch in range(EPOCHS):
         loop.set_postfix(loss=loss.item())
 
     avg_train_loss = train_loss / len(train_loader)
-
-
-    # =========================
-    # 7. VALIDATION LOOP
-    # =========================
-    # Validation checks performance without updating model weights.
 
     model.eval()
     val_loss = 0.0
@@ -150,18 +121,16 @@ for epoch in range(EPOCHS):
     avg_val_loss = val_loss / len(val_loader)
 
     print(
-        f"Epoch {epoch+1}/{EPOCHS} | "
+        f"Epoch {epoch + 1}/{EPOCHS} | "
         f"Train Loss: {avg_train_loss:.4f} | "
         f"Val Loss: {avg_val_loss:.4f}"
     )
 
+    if avg_val_loss < best_val_loss:
+        best_val_loss = avg_val_loss
+        torch.save(model.state_dict(), MODEL_SAVE_PATH)
+        print(f"Best model saved with Val Loss: {best_val_loss:.4f}")
 
-# =========================
-# 8. SAVE MODEL
-# =========================
-# After training, we save the model weights.
 
-os.makedirs("models", exist_ok=True)
-torch.save(model.state_dict(), MODEL_SAVE_PATH)
-
-print("Model saved to:", MODEL_SAVE_PATH)
+print("Training finished.")
+print("Best model saved to:", MODEL_SAVE_PATH)
