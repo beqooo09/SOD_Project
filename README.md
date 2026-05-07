@@ -1,21 +1,47 @@
-<<<<<<< HEAD
-# Salient Object Detection Project
+## Dataset
 
-Deep Learning project for Salient Object Detection using CNN architectures and PyTorch.
+This project uses the DUTS saliency detection dataset. The dataset contains RGB images and corresponding binary saliency masks.
 
-## Features
-- Dataset preprocessing
-- CNN encoder-decoder architecture
-- Training and evaluation pipeline
-- Visualization of predictions
-- Performance metrics (IoU, Precision, Recall, F1)
+The dataset is not uploaded to GitHub because of file size limits. It should be placed locally as:
 
-## Tech Stack
-- Python
-- PyTorch
-- OpenCV
-- NumPy
-- Matplotlib
-=======
-# SOD_Project
->>>>>>> d5598013ee6b061eb7950b581f7d210cf1f64df0
+dataset/DUTS-TR/DUTS-TR-Image
+dataset/DUTS-TR/DUTS-TR-Mask
+
+## Training
+
+The model was trained locally using an NVIDIA RTX 4070 Laptop GPU.
+
+Training configuration:
+- Image size: 256x256
+- Batch size: 8
+- Epochs: 50
+- Optimizer: Adam
+- Loss function: Binary Cross Entropy
+
+## Results
+
+Baseline CNN evaluation results:
+
+- Mean IoU: 0.3891
+- Mean Precision: 0.6786
+- Mean Recall: 0.5000
+- Mean F1 Score: 0.5235
+
+The model successfully detects salient regions, but some predictions contain noisy boundaries and fragmented masks. This is expected for a simple baseline encoder-decoder CNN.
+
+## Project Structure
+
+src/data_loader.py - Loads images and masks for training  
+src/model.py - Defines the CNN encoder-decoder model  
+src/train.py - Trains the model on GPU  
+src/evaluate.py - Evaluates the model and saves prediction visualizations  
+results/predictions - Contains sample prediction outputs  
+models - Stores trained model weights locally  
+
+## Future Improvements
+
+- Add Batch Normalization
+- Add Dropout
+- Use U-Net style skip connections
+- Try a pretrained encoder
+- Improve data augmentation
