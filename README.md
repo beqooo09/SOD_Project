@@ -22,10 +22,11 @@ Training configuration:
 
 Baseline CNN evaluation results:
 
-- Mean IoU: 0.3891
-- Mean Precision: 0.6786
-- Mean Recall: 0.5000
-- Mean F1 Score: 0.5235
+Improved U-Net + ResNet34
+IoU: 0.9186
+Precision: 0.9634
+Recall: 0.9515
+F1: 0.9535
 
 The model successfully detects salient regions, but some predictions contain noisy boundaries and fragmented masks. This is expected for a simple baseline encoder-decoder CNN.
 
