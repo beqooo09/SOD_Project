@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-from model import get_model
+from sod_model import get_model
 
 
 # =========================
