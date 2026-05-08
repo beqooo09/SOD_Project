@@ -1,1 +1,0 @@
-Please refer to http://mmcheng.net/msra10k for important information regarding using the dataset.
